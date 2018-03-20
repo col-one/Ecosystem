@@ -34,9 +34,9 @@ import os
 import platform
 import subprocess
 import sys
-from .environment import Tool, Environment
+from ecosystem.environment import Tool, Environment
 
-from .settings import MAKE_COMMAND, MAKE_TARGET
+from ecosystem.settings import MAKE_COMMAND, MAKE_TARGET
 
 _ON_WINDOWS = (platform.system().lower() == 'windows')
 
@@ -54,6 +54,7 @@ def list_available_tools():
 
 def call_process(arguments):
     if _ON_WINDOWS:
+        print('ecosystem run command line : {arguments}'.format(**locals()))
         subprocess.call(arguments, shell=True)
     else:
         subprocess.call(arguments)
@@ -82,12 +83,14 @@ def build(tools=None, force_rebuild=False, quick_build=False, deploy=False):
         call_process(MAKE_COMMAND)
 
 
-def run(tools=None, run_application=None):
+def run(tools=None, run_application=None, extra_args=None):
     tools = tools or []
+    extra_args = extra_args or []
     env = Environment(tools)
+    cmd = [run_application] + extra_args
     if env.success:
         env.set_env(os.environ)
-        call_process([run_application])
+        call_process(cmd)
 
 
 def set_environment(tools=None):
@@ -128,10 +131,14 @@ Example:
                         help='run an application')
     parser.add_argument('-s', '--setenv', action='store_true',
                         help='output setenv statements to be used to set the shells environment')
+    parser.add_argument('-x', '--extra', type=str, default=None,
+                        help='specify a list of extra args pass to run application, separated by commas')
 
     args = parser.parse_args(argv)
 
     tools = args.tools.split(',') if args.tools is not None else []
+
+    extra = args.extra.split(',') if args.extra is not None else []
 
     try:
         if args.listtools:
@@ -143,7 +150,7 @@ Example:
             else:
                 build(tools, args.force, args.make, args.deploy)
         elif args.run is not None:
-            run(tools, args.run)
+            run(tools, args.run, extra)
         elif args.setenv:
             set_environment(tools)
         return 0
