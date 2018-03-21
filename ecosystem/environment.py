@@ -7,8 +7,9 @@ from .want import Want
 class Environment(object):
     """Once initialized this will represent the environment defined by the wanted tools."""
 
-    def __init__(self, wants, env_dir=None, force=False):
+    def __init__(self, wants, env_dir=None, extra_env_dirs=None, force=False):
         self._wants = wants
+        extra_env_dirs = extra_env_dirs or []
         env_dir = env_dir or os.getenv('ECO_ENV', '')
         self.force = force
 
@@ -16,6 +17,7 @@ class Environment(object):
         self.variables = {}
         self.success = True
         self.environment_files = os.path.join(env_dir, '*.env')
+        self.extra_environment_files = [os.path.join(env_dir, '*.env') for env_dir in extra_env_dirs]
 
         missing_tools = self.missing_tools
         if missing_tools:
@@ -56,7 +58,10 @@ class Environment(object):
     @property
     def define_tools(self):
         defined = [Tool(file_name) for file_name in glob.glob(self.environment_files)]
-        return dict([(tool.tool_plus_version, tool) for tool in defined])
+        extra_defined = [Tool(file_name) for f in self.extra_environment_files for file_name in glob.glob(f)]
+        defined_dict = dict([(tool.tool_plus_version, tool) for tool in defined])
+        defined_dict.update(dict([(tool.tool_plus_version, tool) for tool in extra_defined]))
+        return defined_dict
 
     @property
     def requested_tools(self):
@@ -152,5 +157,9 @@ class Environment(object):
 
             # run this code twice to cross-expand any variables
             for _ in range(2):
-                for env_name, env_value in environ.items():
+                for env_name, env_value in dict(environ).items():
+                    if self.variables.get(env_name):
+                        if self.variables[env_name].has_value() == ['']:
+                            del os.environ[env_name]
+                            continue
                     os.environ[env_name] = os.path.expandvars(env_value)

@@ -34,9 +34,9 @@ import os
 import platform
 import subprocess
 import sys
-from ecosystem.environment import Tool, Environment
-
-from ecosystem.settings import MAKE_COMMAND, MAKE_TARGET
+import traceback
+from ecosystem.ecosystem.environment import Tool, Environment
+from ecosystem.ecosystem.settings import MAKE_COMMAND, MAKE_TARGET
 
 _ON_WINDOWS = (platform.system().lower() == 'windows')
 
@@ -83,10 +83,10 @@ def build(tools=None, force_rebuild=False, quick_build=False, deploy=False):
         call_process(MAKE_COMMAND)
 
 
-def run(tools=None, run_application=None, extra_args=None):
+def run(tools=None, run_application=None, extra_args=None, extra_env=None):
     tools = tools or []
     extra_args = extra_args or []
-    env = Environment(tools)
+    env = Environment(tools, extra_env_dirs=extra_env)
     cmd = [run_application] + extra_args
     if env.success:
         env.set_env(os.environ)
@@ -131,14 +131,18 @@ Example:
                         help='run an application')
     parser.add_argument('-s', '--setenv', action='store_true',
                         help='output setenv statements to be used to set the shells environment')
-    parser.add_argument('-x', '--extra', type=str, default=None,
-                        help='specify a list of extra args pass to run application, separated by commas')
+    parser.add_argument('-e', '--envlocation', type=str, default=None,
+                        help='precise env files directories other than ECO_ENV var, separated by commas')
+
+    args, extra = parser.parse_known_args()
+    for extra_arg in extra:
+        argv.remove(extra_arg)
 
     args = parser.parse_args(argv)
 
     tools = args.tools.split(',') if args.tools is not None else []
 
-    extra = args.extra.split(',') if args.extra is not None else []
+    env_dir = args.envlocation.split(',') if args.envlocation is not None else []
 
     try:
         if args.listtools:
@@ -150,11 +154,13 @@ Example:
             else:
                 build(tools, args.force, args.make, args.deploy)
         elif args.run is not None:
-            run(tools, args.run, extra)
+            run(tools, args.run, extra, env_dir)
         elif args.setenv:
             set_environment(tools)
         return 0
     except Exception as e:
+        exc_info = sys.exc_info()
+        traceback.print_exception(*exc_info)
         sys.stderr.write('ERROR: {0:s}'.format(str(e)))
         return 1
 
