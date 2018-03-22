@@ -135,8 +135,20 @@ Example:
                         help='precise env files directories other than ECO_ENV var, separated by commas')
 
     args, extra = parser.parse_known_args()
-    for extra_arg in extra:
-        argv.remove(extra_arg)
+
+    # manage extra args for --run app
+    try:
+        r_id = argv.index('-r')
+    except ValueError:
+        try:
+            r_id = argv.index('--run')
+        except ValueError:
+            r_id = None
+            extra = []
+    if r_id:
+        extra = argv[r_id+2:]
+        for extra_arg in extra:
+            argv.remove(extra_arg)
 
     args = parser.parse_args(argv)
 
